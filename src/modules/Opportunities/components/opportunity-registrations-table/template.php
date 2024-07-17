@@ -11,53 +11,50 @@ $this->layout = 'entity';
 $this->import('
     entity-table
     mc-card
+    mc-export-spreadsheet
     mc-icon
     mc-multiselect
     mc-select
     mc-status
     mc-tag-list
+    registration-editable-fields
     v1-embed-tool
 ');
 
 $entity = $this->controller->requestedEntity;
 ?>
 <div class="opportunity-registration-table grid-12">
-    <div class="col-12">
+    <div v-if="!hideTitle" class="col-12">
         <h2 class="opportunity-status" v-if="phase.publishedRegistrations"><?= i::__("Os resultados já foram publicados") ?></h2>
         <h2 class="opportunity-status" v-if="!phase.publishedRegistrations && isPast()"><?= i::__("A fase já está encerrada") ?></h2>
         <h2 class="opportunity-status" v-if="isHappening()"><?= i::__("A fase está em andamento") ?></h2>
         <h2 class="opportunity-status" v-if="isFuture()"><?= i::__("A fase ainda não iniciou") ?></h2>
     </div>
     <template v-if="!isFuture()">
-
-        <?php $this->applyTemplateHook('registration-list-actions', 'before', ['entity' => $entity]); ?>
-        <div class="col-12 opportunity-registration-table__buttons">
-            <?php $this->applyTemplateHook('registration-list-actions', 'begin', ['entity' => $entity]); ?>
-            
-            <?php $this->applyTemplateHook('registration-list-actions', 'end', ['entity' => $entity]); ?>
-        </div>
-        <?php $this->applyTemplateHook('registration-list-actions', 'after', ['entity' => $entity]); ?>
-
+        <template v-if="!hideActions">
+            <?php $this->applyTemplateHook('registration-list-actions', 'before', ['entity' => $entity]); ?>
+            <div class="col-12 opportunity-registration-table__buttons">
+                <?php $this->applyTemplateHook('registration-list-actions', 'begin', ['entity' => $entity]); ?>
+                
+                <?php $this->applyTemplateHook('registration-list-actions', 'end', ['entity' => $entity]); ?>
+            </div>
+            <?php $this->applyTemplateHook('registration-list-actions', 'after', ['entity' => $entity]); ?>
+        </template>
         <div class="col-12"> 
-            <entity-table controller="opportunity" endpoint="findRegistrations" type="registration" :query="query" :limit="100" :sort-options="sortOptions" :order="order" :select="select" :headers="headers" phase:="phase" required="number,options" :visible="visibleColumns" @clear-filters="clearFilters" @remove-filter="removeFilter($event)" show-index :hide-filters="hideFilters" :hide-sort="hideSort" :hide-actions='hideActions'>
+            <entity-table controller="opportunity" endpoint="findRegistrations" :identifier="identifier" type="registration" :query="query" :limit="100" :sort-options="sortOptions" :order="order" :select="select" :headers="headers" phase:="phase" required="number,options" :visible="visibleColumns" @clear-filters="clearFilters" @remove-filter="removeFilter($event)" show-index :hide-filters="hideFilters" :hide-sort="hideSort" :hide-actions='hideActions' :hide-header="hideHeader">
                 <template #title>
-                    <slot name="title">
-                        <h5>
-                            <strong><?= i::__("Clique no número de uma inscrição para conferir todas as avaliações realizadas.") ?></strong>
-                            <?= i::__("Após conferir, você pode alterar os status das inscrições de maneira coletiva ou individual e aplicar os resultados das avaliações.") ?>
-                        </h5>
-                    </slot>
+                    <slot name="title"></slot>
                 </template>
                 
                 <?php $this->applyTemplateHook('registration-list-actions-entity-table', 'before', ['entity' => $entity]); ?>
                 <template v-if="!hideActions" #actions="{entities,filters}">
-                    <h4 class="bold"><?= i::__('Ações:') ?></h4>
-                    <div class="opportunity-payment-table__actions">
-                        <div class="opportunity-payment-table__actions grid-12">
-                            <?php $this->applyTemplateHook('registration-list-actions-entity-table', 'begin', ['entity' => $entity]); ?>
-                                <mc-link :entity="phase" route="reportDrafts" class="button button--primarylight button--icon button--large col-2"><?= i::__("Baixar rascunhos") ?> <mc-icon name="download"></mc-icon></mc-link>
-                                <mc-link :entity="phase" route="report" class="button button--primarylight button--icon button--large col-2"><?= i::__("Baixar lista de inscrições") ?> <mc-icon name="download"></mc-icon></mc-link>
-                            <?php $this->applyTemplateHook('registration-list-actions-entity-table', 'end', ['entity' => $entity]); ?>
+                    <div class="opportunity-registration-table__actions">
+                        <h4 class="bold"><?= i::__('Ações:') ?></h4>
+                        <div class="opportunity-registration-table__actions-buttons">
+                        <?php $this->applyTemplateHook('registration-list-actions-entity-table', 'begin', ['entity' => $entity]); ?>
+                            <mc-link :entity="phase" route="reportDrafts" class="button button--primarylight button--icon"><?= i::__("Baixar rascunhos") ?> <mc-icon name="download"></mc-icon></mc-link>
+                            <mc-export-spreadsheet :owner="phase" endpoint="registrations" :params="{entityType: 'registration', '@select': 'id,createTimestamp,sentTimestamp,status,subsite,consolidatedResult,number,proponentType,range,score,eligible,agentsData', '@order': 'id DESC', query}" group="registrations-spreadsheets"></mc-export-spreadsheet>
+                        <?php $this->applyTemplateHook('registration-list-actions-entity-table', 'end', ['entity' => $entity]); ?>
                         </div>
                     </div>
                 </template>
@@ -120,7 +117,7 @@ $entity = $this->controller->requestedEntity;
                 </template>
 
                 <template #agent="{entity}">
-                    <a :href="entity.owner.singleUrl">{{entity.owner.name}}</a>
+                    <a :href="entity.owner?.singleUrl">{{entity.owner?.name}}</a>
                 </template>
 
                 <template #number="{entity}">
@@ -130,6 +127,28 @@ $entity = $this->controller->requestedEntity;
                 <template #eligible="{entity}">
                     <span v-if="entity.eligible"><?= i::__('Sim') ?></span>
                     <span v-else> &nbsp; </span>
+                </template>
+
+                <template #editable={entity}>
+                    <registration-editable-fields :registration="entity">
+                        <template #default="{modal}">
+                            <button @click="modal.open()" v-if="!statusEditRegistration(entity)" class="button button--icon button--sm button--text opportunity-registration-table__edit">
+                                <mc-icon name="edit"></mc-icon> <?= i::__('Abrir para edição') ?>
+                            </button>
+
+                            <button @click="modal.open()" v-if="statusEditRegistration(entity) == 'open'" class="button button--icon button--sm button--text opportunity-registration-table__edit-open">
+                                <mc-icon name="exclamation"></mc-icon> {{entity.editableUntil.date('2-digit year')}}
+                            </button>
+
+                            <button @click="modal.open()" v-if="statusEditRegistration(entity) == 'sent'" class="button button--icon button--sm button--text opportunity-registration-table__edit-sent">
+                                <mc-icon name="circle-checked"></mc-icon> {{entity.editSentTimestamp.date('2-digit year')}}
+                            </button>
+
+                            <button @click="modal.open()" v-if="statusEditRegistration(entity) == 'missed'" class="button button--icon button--sm button--text opportunity-registration-table__edit-missed">
+                                <mc-icon name="exclamation"></mc-icon> {{entity.editableUntil.date('2-digit year')}}
+                            </button>
+                        </template>
+                    </registration-editable-fields>
                 </template>
 
             </entity-table>

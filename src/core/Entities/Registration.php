@@ -9,6 +9,7 @@ use MapasCulturais\Traits;
 use MapasCulturais\App;
 use MapasCulturais\Exceptions\PermissionDenied;
 use MapasCulturais\Definitions\EvaluationMethod;
+use MapasCulturais\GuestUser;
 
 /**
  * Registration
@@ -225,6 +226,27 @@ class Registration extends \MapasCulturais\Entity
      */
     protected $eligible;
 
+    /**
+     * @var dateTime
+     *
+     * @ORM\Column(name="editable_until", type="datetime", nullable=true)
+     */
+    protected $editableUntil;
+
+    /**
+     * @var dateTime
+     *
+     * @ORM\Column(name="edit_sent_timestamp", type="datetime", nullable=true)
+     */
+    protected $editSentTimestamp;
+
+     /**
+     * @var array
+     *
+     * @ORM\Column(name="editable_fields", type="json", nullable=true)
+     */
+    protected $editableFields;
+
      /**
      * @var \MapasCulturais\Entities\Subsite
      *
@@ -255,6 +277,13 @@ class Registration extends \MapasCulturais\Entity
         }
 
         parent::__construct();
+    }
+
+    public static function getEntityTypeLabel($plural = false): string {
+        if ($plural)
+            return \MapasCulturais\i::__('Inscrições');
+        else
+            return \MapasCulturais\i::__('Inscrição');
     }
 
     function save($flush = false){
@@ -428,6 +457,10 @@ class Registration extends \MapasCulturais\Entity
 
     public function canSee($key)
     {
+        if(in_array($key, ['id', 'number', 'category', 'range', 'proponentType'])){
+            return true;
+        }
+
         $avaliableEvaluationFields = ($this->opportunity->avaliableEvaluationFields != "null") ? $this->opportunity->avaliableEvaluationFields : [];
         if(in_array($key, array_keys($avaliableEvaluationFields))){
             return true;
@@ -453,6 +486,30 @@ class Registration extends \MapasCulturais\Entity
 
     static function getSpaceRelationEntityClassName() {
         return RegistrationSpaceRelation::class;
+    }
+
+    function setEditableUntil($datetime) {
+        if ($this->opportunity->canUser('@control')) {
+            $this->editableUntil = new DateTime($datetime);
+        }
+    }
+
+    function setEditableFields($fields) {
+        if ($this->opportunity->canUser('@control')) {
+            $this->editableFields = $fields;
+        }
+    }
+
+    function reopenEditableFields() {
+        $this->opportunity->checkPermission('@control');
+        $this->editSentTimestamp = null;
+        $this->save(true);
+    }
+
+    function sendEditableFields() {
+        $this->checkPermission('sendEditableFields');
+        $this->editSentTimestamp = new DateTime();
+        $this->save(true);
     }
 
     function setOwnerId($id){
@@ -998,16 +1055,27 @@ class Registration extends \MapasCulturais\Entity
         $use_range = (bool) $opportunity->registrationRanges;
         $use_proponent_types = (bool) $opportunity->registrationProponentTypes;
 
-        if ($use_category && count($field->categories) > 0 && !in_array($this->category, $field->categories)) {
+        $field_categories = $field->categories ?: [];
+        $field_ranges = $field->registrationRanges ?: [];
+        $field_proponent_types = $field->proponentTypes ?: [];
+
+
+        if ($use_category && count($field_categories) > 0 && !in_array($this->category, $field_categories)) {
             return false;
         }
 
-        if ($use_range && count($field->registrationRanges) > 0 && !in_array($this->range, $field->registrationRanges)) {
+        if ($use_range && count($field_ranges) > 0 && !in_array($this->range, $field_ranges)) {
             return false;
         }
 
-        if ($use_proponent_types && count($field->proponentTypes) > 0 && !in_array($this->proponentType, $field->proponentTypes)) {
+        if ($use_proponent_types && count($field_proponent_types) > 0 && !in_array($this->proponentType, $field_proponent_types)) {
             return false;
+        }
+
+        if($field->conditional){
+            $_fied_name = $field->conditionalField;
+            $_fied_value = $field->conditionalValue;
+            return $this->$_fied_name == $_fied_value;
         }
 
         return true;
@@ -1109,6 +1177,8 @@ class Registration extends \MapasCulturais\Entity
             }
 
             $field_required = $rfc->required;
+            
+            /** @todo Verificar se este if ainda é necessário após a implementação do isFieldVisisble()*/
             if($rfc->conditional){
                 $_fied_name = $rfc->conditionalField;
                 $_fied_value = $rfc->conditionalValue;
@@ -1140,6 +1210,7 @@ class Registration extends \MapasCulturais\Entity
             $field_name = $field_prefix . $field->id;
             $field_required = $field->required;
             
+            /** @todo Verificar se este if ainda é necessário após a implementação do isFieldVisisble()*/
             if($metadata_definition && $metadata_definition->config && $metadata_definition->config['registrationFieldConfiguration'] && $metadata_definition->config['registrationFieldConfiguration']->conditional){
                 $conf =  $metadata_definition->config['registrationFieldConfiguration'];
               
@@ -1430,6 +1501,18 @@ class Registration extends \MapasCulturais\Entity
         return $this->canUser('@control');
     }
 
+    protected function canUserSendEditableFields(User | GuestUser $user):bool {
+        if (!$this->canUser('@control')) {
+            return false;
+        }
+
+        if ($this->editableUntil < new DateTime() || $this->editSentTimestamp) {
+            return false;
+        }
+
+        return true;
+    }
+
     protected function canUserModify($user){
         if($this->status !== self::STATUS_DRAFT){
             return false;
@@ -1490,10 +1573,6 @@ class Registration extends \MapasCulturais\Entity
         }
         
         if(new DateTime('now') < $this->opportunity->evaluationMethodConfiguration->evaluationFrom || new DateTime('now') > $this->opportunity->evaluationMethodConfiguration->evaluationTo){
-            return false;
-        }
-
-        if($this->opportunity->publishedRegistrations){
             return false;
         }
 
