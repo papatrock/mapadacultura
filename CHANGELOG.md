@@ -4,6 +4,9 @@ Todas as mudanças notáveis no projeto serão documentadas neste arquivo.
 
 O formato é baseado no [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e este projeto adere ao [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [7.5.0-RC]
+### Melhorias
+- Implemente configuração que possibilita tornar obrigatória a inserção de uma imagem de avatar pelo agente ao enviar a inscrição.
 
 ## [unreleased]
 ### Novas funcionalidades
@@ -18,6 +21,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Cria novas colunas na tabela registration para funcionalidade de edição de inscrições
 - Implementa modo de visualização das entidades em tabelas para admins do sistema
 - Implementa bloqueio de edição de entidades, evitando que duas pessoas diferentes editem a mesma entidade simultaneamente
+- Corrige erro que ao publicar a entidade a mesma permanece em rascunho
+- Implementa possibilidade de exigir que o proponente defina uma imagem de avatar no momento da inscrição
+- Implementa nova tela para configuração dos agentes de suporte
 
 ### Melhorias
 - Salva revisão dos campos dos formulários das oportunidades, tornando possível auditoria das modificações nos formulários
@@ -27,11 +33,29 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Refatoraçào na configuração de cotas, para que seja possível escolher os campos que representam as cotas por tipo de proponente, evitando conflitos
 - Refatoração na configuração de distribuição de vagas por território, para que seja possível definir quais campos representam a região para cada tipo de proponente.
 - Refatoração no cálculo das cotas, para que sejam respeitadas dentro de cada faixa/linha e região.
+- Implementa slot no entity-table para permitir substituição do filtro por palavra-chave
+- Implementa método detectDateFormat() no Utils para detectar o formato de uma data
+- Implementa nova tabela de listagem de avaliações
 
 ### Correções
 
 ### Melhorias não funcionais
 - Possibilidade de configurar metadados `readonly` que após serem definido o valor uma vez, um usuário que comum não pode alterar.
+
+## [7.4.12]
+### Correções
+- Corrige erro que deixava a condicionalidade dos campos/anexos ativada ao editar, mesmo ele não estando condicionado a outro
+- Corrige erro na tabela de listagem de inscrições que impedia a listagem de todas as inscrições de oportunidades multifases
+- Corrige erro do entity-field que impedia as opções serem exibidas e salvas quando se usava campo do tipo radio
+- Corrige erro ao definir a latitude e longitude em campos do agente responsável que fazem sincronia com a inscrição (Campos @)
+- Corrige erro que não deixava a autorização de publicar a localização atravez do formulario de inscrição em campos @
+- Corrige o processo de limpeza do cache dos resumos de inscrições para que seja atualizado corretamente nas mudanças de status das inscrições
+- Corrige sincronização de inscrição no botão do resumo de inscrições
+- Faz o enfileiramento do job UpdateSummaryCaches no endpoint syncRegistrations para que atualize tambem o resumo de inscrições
+- Corrige carregamento do menu 'Meu Perfil' no menu principal quando a pessoa esta deslogada
+
+### Melhorias
+- Ajusta filtros de avaliações na tela do avaliador possibilitando filtrar pelos status de avanço da avaliação
 
 ## [7.4.11] - 2024-07-10
 ### Melhorias
