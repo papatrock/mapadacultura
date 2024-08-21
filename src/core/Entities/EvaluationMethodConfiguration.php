@@ -336,16 +336,16 @@ class EvaluationMethodConfiguration extends \MapasCulturais\Entity {
 
         // status das avaliações
 
-        // Conta as inscrições avaliadas por consolidated_result
+        // Conta as inscrições avaliadas por consolidatedResult
         $query = $app->em->createQuery("
             SELECT 
-                r.consolidated_result, 
+                r.consolidatedResult, 
                 count(r) as qtd 
             FROM 
                 MapasCulturais\\Entities\\Registration r  
             WHERE 
                 r.opportunity = :opp AND r.status > 0
-            GROUP BY r.consolidated_result
+            GROUP BY r.consolidatedResult
         ");
 
         $query->setParameters([
@@ -354,7 +354,7 @@ class EvaluationMethodConfiguration extends \MapasCulturais\Entity {
         
         if($result = $query->getResult()){
             foreach($result as $values){
-                $status = $em->valueToString($values['consolidated_result']);
+                $status = $em->valueToString($values['consolidatedResult']);
                 if($status) {
                     $data['evaluations'][$status] = $values['qtd'];
                 } else {
